@@ -1,0 +1,6 @@
+includes: ['layer:basic', 'layer:apt']
+options:
+  apt:
+    packages:
+      - rethinkdb
+repo: https://github.com/tengu-team/layer-rethinkdb.git 
