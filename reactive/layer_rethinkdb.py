@@ -29,12 +29,12 @@ def configure_rethinkdb():
     status_set('maintenance', 'configuring RethinkDB')
     conf = config()
     port = conf['port']
-    bind = conf['bind']
+    driver_port = conf['driver_port']
     render(source='rethinkdb.conf',
            target='/etc/rethinkdb/instances.d/instance1.conf',
            context={
                'port': str(port),
-               'IPaddress': bind
+               'driver_port': str(driver_port)
            })
     open_port(port)
     set_state('rethinkdb.configured')
@@ -51,17 +51,21 @@ def change_configuration():
     status_set('maintenance', 'configuring RethinkDB')
     conf = config()
     port = conf['port']
+    driver_port = conf['driver_port']
     old_port = conf.previous('port')
-    bind = conf['bind']
-    if conf.changed('port'):
+    old_driver_port = conf.previous('driver_port')
+    if conf.changed('port') or conf.changed('driver_port'):
         render(source='rethinkdb.conf',
                target='/etc/rethinkdb/instances.d/instance1.conf',
                context={
                    'port': str(port),
-                   'IPaddress': bind
+                   'driver_port': str(driver_port)
                })
         if old_port is not None:
             close_port(old_port)
+        if old_driver_port is not None:
+            close_port(old_driver_port)
         open_port(port)
+        open_port(driver_port)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
     status_set('active', 'RethinkDB running')

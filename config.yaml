@@ -4,12 +4,11 @@ options:
     default: 8080
     description: |
       RethinkDB web UI port.
-  bind:
-    type: string
-    default: "all"
+  driver_port:
+    type: int
+    default: 28015
     description: |
-      Address of local interfaces to listen on when accepting connections.
-      May be 'all' or an IP address, loopback addresses are enabled by default.
+      The port for rethinkdb protocol for client drivers.
   package_status:
     default: "install"
     type: string
