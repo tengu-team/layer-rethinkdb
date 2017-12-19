@@ -14,39 +14,33 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
-import os
 import subprocess
-from base64 import b64encode
-from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
-from charmhelpers.core.host import service_restart
 from charms.reactive import when, when_not, set_state
-from charmhelpers.core.hookenv import status_set, open_port, close_port, config, unit_public_ip, unit_private_ip
+from charmhelpers.core.hookenv import status_set, open_port, close_port, config
 
+########################################################################
+# Installation
+########################################################################
 @when('apt.installed.rethinkdb')
-@when_not('rethinkdb.configured')
+@when_not('rethinkdb.installed')
 def configure_rethinkdb():
     status_set('maintenance', 'configuring RethinkDB')
     conf = config()
     port = conf['port']
     driver_port = conf['driver_port']
     render(source='rethinkdb.conf',
-           target='/etc/rethinkdb/instances.d/instance1.conf',
+           target='/etc/rethinkdb/instances.d/default.conf',
            context={
                'port': str(port),
                'driver_port': str(driver_port)
            })
     open_port(port)
-    set_state('rethinkdb.configured')
-
-@when('rethinkdb.configured')
-@when_not('rethinkdb.running')
-def start_rethinkdb():
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
     status_set('active', 'RethinkDB running')
-    set_state('rethinkdb.running')
+    set_state('rethinkdb.installed')
 
-@when('rethinkdb.running', 'config.changed')
+@when('rethinkdb.installed', 'config.changed')
 def change_configuration():
     status_set('maintenance', 'configuring RethinkDB')
     conf = config()
@@ -56,7 +50,7 @@ def change_configuration():
     old_driver_port = conf.previous('driver_port')
     if conf.changed('port') or conf.changed('driver_port'):
         render(source='rethinkdb.conf',
-               target='/etc/rethinkdb/instances.d/instance1.conf',
+               target='/etc/rethinkdb/instances.d/default.conf',
                context={
                    'port': str(port),
                    'driver_port': str(driver_port)
