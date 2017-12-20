@@ -1,6 +1,6 @@
-includes: ['layer:basic', 'layer:apt']
+includes: ['layer:basic', 'layer:apt', 'interface:rethinkdb-cluster']
 options:
   apt:
     packages:
       - rethinkdb
-repo: https://github.com/tengu-team/layer-rethinkdb.git 
+repo: https://github.com/tengu-team/layer-rethinkdb.git

@@ -36,6 +36,7 @@ def configure_rethinkdb():
                'driver_port': str(driver_port)
            })
     open_port(port)
+    open_port(driver_port)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
     status_set('active', 'RethinkDB running')
     set_state('rethinkdb.installed')

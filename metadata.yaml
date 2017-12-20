@@ -3,8 +3,11 @@ summary: This charm will Install RethinkDB in stand-alone mode.
 maintainer: Dixan Peña Peña <dixan.pena@tengu.io>
 description: |
    RethinkDB is the first open-source, scalable JSON database built from
-   the ground up for the realtime web. 
+   the ground up for the realtime web.
 tags:
   - database
 subordinate: false
+peers:
+  cluster:
+    interface: rethinkdb-cluster
 series: ['xenial']
