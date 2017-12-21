@@ -1,4 +1,4 @@
-includes: ['layer:basic', 'layer:apt', 'interface:rethinkdb-cluster']
+includes: ['layer:basic', 'layer:apt', 'layer:leadership', 'interface:rethinkdb-cluster']
 options:
   apt:
     packages:

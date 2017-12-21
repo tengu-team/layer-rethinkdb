@@ -16,10 +16,10 @@
 # pylint: disable=c0111,c0103,c0301
 
 import subprocess
+from charms import leadership
 from charmhelpers.core.templating import render
 from charms.reactive import when, when_not, set_flag
-from charmhelpers.core.hookenv import status_set, open_port, close_port, config
-
+from charmhelpers.core.hookenv import status_set, open_port, close_port, config, leader_get, leader_set, unit_private_ip
 
 ########################################################################
 # Installation
@@ -40,6 +40,20 @@ def change_configuration():
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
     status_set('active', 'RethinkDB is running')
 
+########################################################################
+# Leadership
+########################################################################
+@when('leadership.is_leader')
+def locate_leader():
+    leader_set({'leader_ip': unit_private_ip()})
+
+########################################################################
+# Clustering
+########################################################################
+@when('cluster.connected')
+def configure_cluster(cluster):
+    units = cluster.get_peer_addresses()
+    install_cluster(units)
 
 ########################################################################
 # Auxiliary methods
@@ -76,3 +90,17 @@ def change_config(conf):
             close_port(old_driver_port)
         open_port(port)
         open_port(driver_port)
+
+def install_cluster(units):
+    if len(units) > 0 and unit_private_ip != leader_get('leader_ip'):
+        conf = config()
+        port = conf['port']
+        driver_port = conf['driver_port']
+        render(source='rethinkdb.conf',
+               target='/etc/rethinkdb/instances.d/rethinkd.conf',
+               context={
+                   'port': str(port),
+                   'driver_port': str(driver_port),
+                   'clustering': 'join=' + leader_get('leader_ip') + ':29015'
+               })
+        subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
