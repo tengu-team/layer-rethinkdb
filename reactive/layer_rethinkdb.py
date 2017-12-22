@@ -66,7 +66,8 @@ def install_service():
            target='/etc/rethinkdb/instances.d/rethinkd.conf',
            context={
                'port': str(port),
-               'driver_port': str(driver_port)
+               'driver_port': str(driver_port),
+               'clustering': ''
            })
     open_port(port)
     open_port(driver_port)
@@ -82,7 +83,8 @@ def change_config(conf):
                target='/etc/rethinkdb/instances.d/rethinkd.conf',
                context={
                    'port': str(port),
-                   'driver_port': str(driver_port)
+                   'driver_port': str(driver_port),
+                   'clustering': ''
                })
         if old_port is not None:
             close_port(old_port)
@@ -92,7 +94,7 @@ def change_config(conf):
         open_port(driver_port)
 
 def install_cluster(units):
-    if len(units) > 0 and unit_private_ip != leader_get('leader_ip'):
+    if len(units) > 0 and unit_private_ip() != leader_get('leader_ip'):
         conf = config()
         port = conf['port']
         driver_port = conf['driver_port']
