@@ -62,47 +62,58 @@ def install_service():
     conf = config()
     port = conf['port']
     driver_port = conf['driver_port']
+    cluster_port = conf['cluster_port']
     render(source='rethinkdb.conf',
            target='/etc/rethinkdb/instances.d/rethinkd.conf',
            context={
                'port': str(port),
                'driver_port': str(driver_port),
+               'cluster_port': str(cluster_port),
                'clustering': ''
            })
     open_port(port)
     open_port(driver_port)
+    open_port(cluster_port)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
 
 def change_config(conf):
     port = conf['port']
     driver_port = conf['driver_port']
+    cluster_port = conf['cluster_port']
     old_port = conf.previous('port')
     old_driver_port = conf.previous('driver_port')
-    if conf.changed('port') or conf.changed('driver_port'):
+    old_cluster_port = conf.previous('cluster_port')
+    if conf.changed('port') or conf.changed('driver_port') or conf.changed('cluster_port'):
         render(source='rethinkdb.conf',
                target='/etc/rethinkdb/instances.d/rethinkd.conf',
                context={
                    'port': str(port),
                    'driver_port': str(driver_port),
+                   'cluster_port': str(cluster_port),
                    'clustering': ''
                })
         if old_port is not None:
             close_port(old_port)
         if old_driver_port is not None:
             close_port(old_driver_port)
+        if old_cluster_port is not None:
+            close_port(old_cluster_port)
         open_port(port)
         open_port(driver_port)
+        open_port(cluster_port)
 
 def install_cluster(units):
     if len(units) > 0 and unit_private_ip() != leader_get('leader_ip'):
         conf = config()
         port = conf['port']
         driver_port = conf['driver_port']
+        cluster_port = conf['cluster_port']
         render(source='rethinkdb.conf',
                target='/etc/rethinkdb/instances.d/rethinkd.conf',
                context={
                    'port': str(port),
                    'driver_port': str(driver_port),
-                   'clustering': 'join=' + leader_get('leader_ip') + ':29015'
+                   'cluster_port': str(cluster_port),
+                   'clustering': 'join=' + leader_get('leader_ip') + ':' + str(cluster_port)
                })
         subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])

@@ -9,6 +9,11 @@ options:
     default: 28015
     description: |
       The port for rethinkdb protocol for client drivers.
+  cluster_port:
+    type: int
+    default: 29015
+    description: |
+      The port for receiving connections from other nodes.
   package_status:
     default: "install"
     type: string
