@@ -14,6 +14,11 @@ options:
     default: 29015
     description: |
       The port for receiving connections from other nodes.
+  admin_console:
+    type: boolean
+    default: False
+    description: |
+      Enable web administration console.
   package_status:
     default: "install"
     type: string
