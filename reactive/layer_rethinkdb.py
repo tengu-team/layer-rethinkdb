@@ -15,21 +15,27 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
 
+import os
 import subprocess
+from base64 import b64encode
 from charms import leadership
+from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
-from charms.reactive import when, when_not, set_flag
+from charms.reactive import when, when_not, set_flag, is_flag_set
 from charmhelpers.core.hookenv import status_set, open_port, close_port, config, leader_get, leader_set, unit_private_ip, local_unit
+
+kv = unitdata.kv()
 
 ########################################################################
 # Installation
 ########################################################################
-@when('apt.installed.rethinkdb')
+@when('apt.installed.rethinkdb', 'secrets.configured')
 @when_not('rethinkdb.installed')
 def configure_rethinkdb():
     status_set('maintenance', 'configuring RethinkDB')
     install_service()
-    status_set('active', 'RethinkDB is running ')
+    set_password()
+    status_set('active', 'RethinkDB is running with admin password: {}'.format(kv.get('password')))
     set_flag('rethinkdb.installed')
 
 @when('rethinkdb.installed', 'config.changed')
@@ -38,14 +44,25 @@ def change_configuration():
     conf = config()
     change_config(conf)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
-    status_set('active', 'RethinkDB is running ')
+    status_set('active', 'RethinkDB is running with admin password: {}'.format(kv.get('password')))
 
 ########################################################################
 # Leadership
 ########################################################################
 @when('leadership.is_leader')
-def locate_leader():
-    leader_set({'leader_ip': unit_private_ip()})
+@when_not('secrets.configured')
+def set_secrets():
+    password = config()['admin_password']
+    if  password == '':
+        password = b64encode(os.urandom(18)).decode('utf-8')
+    leader_set({'password': password, 'leader_ip': unit_private_ip()})
+    kv.set('password', password)
+    set_flag('secrets.configured')
+
+@when_not('leadership.is_leader', 'secrets.configured')
+def set_secrets_local():
+    kv.set('password', leader_get('password'))
+    set_flag('secrets.configured')
 
 ########################################################################
 # Clustering
@@ -80,7 +97,16 @@ def install_service():
     open_port(port)
     open_port(driver_port)
     open_port(cluster_port)
+    kv.set('initial_state', True)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
+
+def set_password():
+    subprocess.check_call(['sudo', 'apt-get', 'install', 'python3-pip'])
+    subprocess.check_call(['sudo', 'pip3', 'install', 'rethinkdb'])
+    import rethinkdb as r
+    conn = r.connect(host="localhost", port=config()['driver_port'], db='rethinkdb').repl()
+    r.table('users').get('admin').update({'password': kv.get('password')}).run()
+    conn.close()
 
 def change_config(conf):
     port = conf['port']
@@ -117,9 +143,21 @@ def change_config(conf):
         open_port(port)
         open_port(driver_port)
         open_port(cluster_port)
+    if conf.changed('admin_password') and not kv.get('initial_state'):
+        new_password = conf['admin_password']
+        if unit_private_ip() == leader_get('leader_ip'):
+            old_password = leader_get('password')
+            import rethinkdb as r
+            conn = r.connect(host="localhost", port=driver_port, db='rethinkdb', password=old_password).repl()
+            r.table('users').get('admin').update({'password': new_password}).run()
+            conn.close()
+            leader_set({'password': new_password})
+        kv.set('password', new_password)
+    kv.set('initial_state', False)
 
 def install_cluster(units):
-    if len(units) > 0 and unit_private_ip() != leader_get('leader_ip'):
+    leader_available = check_for_leader(units)
+    if len(units) > 0 and unit_private_ip() != leader_get('leader_ip') and leader_available:
         conf = config()
         port = conf['port']
         driver_port = conf['driver_port']
@@ -139,3 +177,12 @@ def install_cluster(units):
                    'clustering': 'join=' + leader_get('leader_ip') + ':' + str(cluster_port)
                })
         subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
+
+def check_for_leader(units):
+    if leader_get('leader_ip') in units:
+        return True
+    elif not leader_get('leader_ip') in units and is_flag_set('leadership.is_leader'):
+        leader_set({'leader_ip': unit_private_ip()})
+        return True
+    else:
+        return False

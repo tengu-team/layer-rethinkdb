@@ -19,6 +19,11 @@ options:
     default: False
     description: |
       Enable web administration console.
+  admin_password:
+    type: string
+    default: ""
+    description: |
+      Password for the admin user.
   package_status:
     default: "install"
     type: string
