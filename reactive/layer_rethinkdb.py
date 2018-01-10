@@ -80,21 +80,16 @@ def install_service():
     port = conf['port']
     driver_port = conf['driver_port']
     cluster_port = conf['cluster_port']
+    unit = local_unit().replace('/', '_')
     if conf['admin_console']:
         admin_console = ''
     else:
         admin_console = 'no-http-admin'
-    render(source='rethinkdb.conf',
-           target='/etc/rethinkdb/instances.d/rethinkd.conf',
-           context={
-               'port': str(port),
-               'driver_port': str(driver_port),
-               'cluster_port': str(cluster_port),
-               'rethinkdb_data': local_unit().replace('/', '_'),
-               'admin_console': admin_console,
-               'clustering': ''
-           })
-    open_port(port)
+    clustering = ''
+    conf_parameters = [str(port), str(driver_port), str(cluster_port), unit, admin_console, clustering]
+    render_conf_file(conf_parameters)
+    if conf['admin_console']:
+        open_port(port)
     open_port(driver_port)
     open_port(cluster_port)
     kv.set('initial_state', True)
@@ -112,6 +107,7 @@ def change_config(conf):
     port = conf['port']
     driver_port = conf['driver_port']
     cluster_port = conf['cluster_port']
+    unit = local_unit().replace('/', '_')
     old_port = conf.previous('port')
     old_driver_port = conf.previous('driver_port')
     old_cluster_port = conf.previous('cluster_port')
@@ -120,32 +116,22 @@ def change_config(conf):
     else:
         admin_console = 'no-http-admin'
     clustering = ''
-    if unit_private_ip() != leader_get('leader_ip'):
+    if not is_flag_set('leadership.is_leader'):
         clustering = 'join=' + leader_get('leader_ip') + ':' + str(cluster_port)
-    conf_params = [conf.changed('port'), conf.changed('driver_port'), conf.changed('cluster_port'), conf.changed('admin_console')]
-    if True in conf_params:
-        render(source='rethinkdb.conf',
-               target='/etc/rethinkdb/instances.d/rethinkd.conf',
-               context={
-                   'port': str(port),
-                   'driver_port': str(driver_port),
-                   'cluster_port': str(cluster_port),
-                   'rethinkdb_data': local_unit().replace('/', '_'),
-                   'admin_console': admin_console,
-                   'clustering': clustering
-               })
-        if old_port is not None:
-            close_port(old_port)
-        if old_driver_port is not None:
-            close_port(old_driver_port)
-        if old_cluster_port is not None:
-            close_port(old_cluster_port)
-        open_port(port)
+    conf_parameters = [str(port), str(driver_port), str(cluster_port), unit, admin_console, clustering]
+    conf_state = [conf.changed('port'), conf.changed('driver_port'), conf.changed('cluster_port'), conf.changed('admin_console')]
+    if True in conf_state:
+        render_conf_file(conf_parameters)
+        for former_port in [old_port, old_driver_port, old_cluster_port]:
+            if former_port is not None:
+                close_port(former_port)
+        if conf['admin_console']:
+            open_port(port)
         open_port(driver_port)
         open_port(cluster_port)
     if conf.changed('admin_password') and not kv.get('initial_state'):
         new_password = conf['admin_password']
-        if unit_private_ip() == leader_get('leader_ip'):
+        if is_flag_set('leadership.is_leader'):
             old_password = leader_get('password')
             import rethinkdb as r
             conn = r.connect(host="localhost", port=driver_port, db='rethinkdb', password=old_password).repl()
@@ -162,21 +148,27 @@ def install_cluster(units):
         port = conf['port']
         driver_port = conf['driver_port']
         cluster_port = conf['cluster_port']
+        unit = local_unit().replace('/', '_')
         if conf['admin_console']:
             admin_console = ''
         else:
             admin_console = 'no-http-admin'
-        render(source='rethinkdb.conf',
-               target='/etc/rethinkdb/instances.d/rethinkd.conf',
-               context={
-                   'port': str(port),
-                   'driver_port': str(driver_port),
-                   'cluster_port': str(cluster_port),
-                   'rethinkdb_data': local_unit().replace('/', '_'),
-                   'admin_console': admin_console,
-                   'clustering': 'join=' + leader_get('leader_ip') + ':' + str(cluster_port)
-               })
+        clustering = 'join=' + leader_get('leader_ip') + ':' + str(cluster_port)
+        conf_parameters = [str(port), str(driver_port), str(cluster_port), unit, admin_console, clustering]
+        render_conf_file(conf_parameters)
         subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
+
+def render_conf_file(conf_parameters):
+    render(source='rethinkdb.conf',
+           target='/etc/rethinkdb/instances.d/rethinkd.conf',
+           context={
+               'port': conf_parameters[0],
+               'driver_port': conf_parameters[1],
+               'cluster_port': conf_parameters[2],
+               'rethinkdb_data': conf_parameters[3],
+               'admin_console': conf_parameters[4],
+               'clustering': conf_parameters[5]
+           })
 
 def check_for_leader(units):
     if leader_get('leader_ip') in units:
