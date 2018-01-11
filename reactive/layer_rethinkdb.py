@@ -85,8 +85,7 @@ def install_service():
         admin_console = ''
     else:
         admin_console = 'no-http-admin'
-    clustering = ''
-    conf_parameters = [str(port), str(driver_port), str(cluster_port), unit, admin_console, clustering]
+    conf_parameters = [str(port), str(driver_port), str(cluster_port), unit, admin_console, '']
     render_conf_file(conf_parameters)
     if conf['admin_console']:
         open_port(port)
