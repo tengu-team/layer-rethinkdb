@@ -1,5 +1,5 @@
 name: rethinkdb
-summary: This charm will Install RethinkDB in stand-alone mode.
+summary: This charm will install RethinkDB either in stand-alone mode or in cluster mode.
 maintainer: Dixan Peña Peña <dixan.pena@tengu.io>
 description: |
    RethinkDB is the first open-source, scalable JSON database built from
