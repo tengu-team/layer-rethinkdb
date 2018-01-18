@@ -34,6 +34,7 @@ kv = unitdata.kv()
 def configure_rethinkdb():
     status_set('maintenance', 'configuring RethinkDB')
     install_service()
+    drop_test()
     set_password()
     status_set('active', 'RethinkDB is running with admin password: {}'.format(kv.get('password')))
     set_flag('rethinkdb.installed')
@@ -94,12 +95,18 @@ def install_service():
     kv.set('initial_state', True)
     subprocess.check_call(['sudo', '/etc/init.d/rethinkdb', 'restart'])
 
-def set_password():
+def drop_test():
     subprocess.check_call(['sudo', 'apt-get', 'install', 'python3-pip'])
     subprocess.check_call(['sudo', 'pip3', 'install', 'rethinkdb'])
     import rethinkdb as r
+    conn = r.connect(host="localhost", port=config()['driver_port'], db='test').repl()
+    r.db_drop('test').run(conn)
+    conn.close()
+
+def set_password():
+    import rethinkdb as r
     conn = r.connect(host="localhost", port=config()['driver_port'], db='rethinkdb').repl()
-    r.table('users').get('admin').update({'password': kv.get('password')}).run()
+    r.table('users').get('admin').update({'password': kv.get('password')}).run(conn)
     conn.close()
 
 def change_config(conf):
@@ -134,7 +141,7 @@ def change_config(conf):
             old_password = leader_get('password')
             import rethinkdb as r
             conn = r.connect(host="localhost", port=driver_port, db='rethinkdb', password=old_password).repl()
-            r.table('users').get('admin').update({'password': new_password}).run()
+            r.table('users').get('admin').update({'password': new_password}).run(conn)
             conn.close()
             leader_set({'password': new_password})
         kv.set('password', new_password)
